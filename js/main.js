@@ -6,25 +6,26 @@ const { scene, camera, renderer, controls, updateExposure, updateLight, worldGro
 
 const uiElement = document.getElementById('ui');
 
-document.body.appendChild(ARButton.createButton(renderer, {
+// FIX PANTALLA NEGRA: Asegurar que el overlay no bloquee el inicio de sesión XR
+const arButton = ARButton.createButton(renderer, {
     requiredFeatures: ['hit-test'],
     optionalFeatures: ['dom-overlay'],
     domOverlay: { root: uiElement }
-}));
+});
+document.body.appendChild(arButton);
 
 let hitTestSource = null;
 let hitTestSourceRequested = false;
 let isAutoRotating = false;
 
-// VARIABLES ANTI-SALTO Y GESTOS
+// VARIABLES DE CONTROL
 let isInteracting = false;
 let blockSelectUntil = 0;
 let touchX = 0;
 let initialDistance = 0;
 let initialScale = 1;
 
-// --- FILTRO PARA NO MOVER EL OBJETO AL TOCAR EL MENÚ ---
-const isUI = (e) => {
+const checkUI = (e) => {
     if (e.target.closest('#ui')) {
         isInteracting = true;
         blockSelectUntil = Date.now() + 600;
@@ -34,8 +35,7 @@ const isUI = (e) => {
 };
 
 window.addEventListener('touchstart', (e) => {
-    if (isUI(e)) return;
-    
+    if (checkUI(e)) return;
     if (renderer.xr.isPresenting) {
         if (e.touches.length === 1) {
             touchX = e.touches[0].pageX;
@@ -51,11 +51,9 @@ window.addEventListener('touchstart', (e) => {
 
 window.addEventListener('touchmove', (e) => {
     if (e.target.closest('#ui')) return;
-
     if (renderer.xr.isPresenting) {
         isInteracting = true;
         blockSelectUntil = Date.now() + 800;
-        
         if (e.touches.length === 1) {
             const deltaX = e.touches[0].pageX - touchX;
             touchX = e.touches[0].pageX;
@@ -68,13 +66,10 @@ window.addEventListener('touchmove', (e) => {
     }
 }, { passive: false });
 
-window.addEventListener('touchend', (e) => {
-    if (isInteracting || e.touches.length > 0) {
-        blockSelectUntil = Date.now() + 500;
-    }
+window.addEventListener('touchend', () => {
+    if (isInteracting) blockSelectUntil = Date.now() + 500;
 });
 
-// COLOCACIÓN (SELECT)
 const controller = renderer.xr.getController(0);
 controller.addEventListener('select', () => {
     const now = Date.now();
@@ -87,31 +82,24 @@ controller.addEventListener('select', () => {
 });
 scene.add(controller);
 
-// --- VINCULACIÓN DE TODOS LOS SLIDERS ---
-
-const getV = (id) => parseFloat(document.getElementById(id).value);
-
+// VINCULACIÓN DE SLIDERS
 const syncLight = () => {
-    updateLight(getV('light-angle'), getV('light-intensity'), "#ffffff", getV('shadow-opacity'));
+    updateLight(
+        parseFloat(document.getElementById('light-angle').value),
+        parseFloat(document.getElementById('light-intensity').value),
+        "#ffffff",
+        parseFloat(document.getElementById('shadow-opacity').value)
+    );
 };
 
 document.getElementById('light-angle').addEventListener('input', syncLight);
 document.getElementById('light-intensity').addEventListener('input', syncLight);
 document.getElementById('shadow-opacity').addEventListener('input', syncLight);
-
-document.getElementById('exposure-slider').addEventListener('input', (e) => {
-    updateExposure(parseFloat(e.target.value));
-});
-
-document.getElementById('model-rotation').addEventListener('input', (e) => {
-    worldGroup.rotation.y = parseFloat(e.target.value);
-});
-
+document.getElementById('exposure-slider').addEventListener('input', (e) => updateExposure(parseFloat(e.target.value)));
+document.getElementById('model-rotation').addEventListener('input', (e) => worldGroup.rotation.y = parseFloat(e.target.value));
 document.getElementById('auto-rotate').addEventListener('change', (e) => isAutoRotating = e.target.checked);
+document.getElementById('close-menu').onclick = () => uiElement.classList.toggle('hidden');
 
-document.getElementById('close-menu').onclick = () => uiElement.classList.add('hidden');
-
-// --- CARGA E INICIO ---
 async function initApp() {
     try {
         const modelSelector = document.getElementById('model-select');
@@ -158,12 +146,10 @@ renderer.setAnimationLoop((timestamp, frame) => {
         scene.background = scene.environment;
         reticle.visible = false;
     }
-
     if (isAutoRotating) {
         worldGroup.rotation.y += 0.01;
         document.getElementById('model-rotation').value = worldGroup.rotation.y % 6.28;
     }
-    
     controls.update();
     renderer.render(scene, camera);
 });
