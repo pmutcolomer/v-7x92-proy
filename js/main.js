@@ -2,54 +2,108 @@ import { setupScene } from './scene.js';
 import { loadModel } from './loader.js';
 import { ARButton } from 'three/addons/webxr/ARButton.js';
 
-const { scene, camera, renderer, controls, updateExposure, updateLight, worldGroup, reticle, dirLight } = setupScene();
+const { scene, camera, renderer, controls, updateExposure, updateLight, worldGroup, reticle } = setupScene();
 
-const ui = document.getElementById('ui');
-const btnClose = document.getElementById('close-menu');
-const btnOpen = document.getElementById('open-menu');
-
-// Botón AR Estándar (Sin overlay para evitar pantalla negra en Redmi)
-document.body.appendChild(ARButton.createButton(renderer, {
-    requiredFeatures: ['hit-test']
-}));
-
+let ui, btnClose, btnOpen;
+let isAutoRotating = false;
 let hitTestSource = null;
 let hitTestSourceRequested = false;
-let isAutoRotating = false;
 
-// VARIABLES DE GESTOS
+// VARIABLES GESTOS
 let isInteracting = false;
 let blockSelectUntil = 0;
 let touchX = 0;
 let initialDistance = 0;
 let initialScale = 1;
 
-// --- COLAPSO DE MENÚ ---
-btnClose.onclick = () => {
-    ui.classList.add('hidden');
-    btnOpen.style.display = 'block';
-};
+async function init() {
+    // 1. CARGAR UI
+    const uiResponse = await fetch('ui.html');
+    const uiHtml = await uiResponse.text();
+    const uiContainer = document.createElement('div');
+    uiContainer.innerHTML = uiHtml;
+    document.body.appendChild(uiContainer);
 
-btnOpen.onclick = () => {
-    ui.classList.remove('hidden');
-    btnOpen.style.display = 'none';
-};
+    // 2. VINCULAR BOTONES COLAPSO
+    ui = document.getElementById('ui');
+    btnClose = document.getElementById('close-menu');
+    btnOpen = document.getElementById('open-menu');
 
-// --- GESTIÓN DE TOQUES ---
+    if (btnClose && btnOpen) {
+        btnClose.onclick = () => { ui.classList.add('hidden'); btnOpen.style.display = 'block'; };
+        btnOpen.onclick = () => { ui.classList.remove('hidden'); btnOpen.style.display = 'none'; };
+    }
+
+    // 3. ACTIVAR LÓGICA DE PESTAÑAS Y SLIDERS
+    setupUIControls();
+
+    // 4. CARGAR MODELOS
+    const response = await fetch('meshes/list.json');
+    const models = await response.json();
+    const selector = document.getElementById('model-select');
+    if (selector) {
+        selector.innerHTML = '';
+        models.forEach(m => {
+            const opt = document.createElement('option');
+            opt.value = m.file; opt.textContent = m.name;
+            selector.appendChild(opt);
+        });
+        selector.onchange = (e) => loadModel(worldGroup, `meshes/${e.target.value}`, controls);
+        if (models.length > 0) loadModel(worldGroup, `meshes/${models[0].file}`, controls);
+    }
+
+    document.body.appendChild(ARButton.createButton(renderer, { requiredFeatures: ['hit-test'] }));
+    renderer.setAnimationLoop(render);
+}
+
+function setupUIControls() {
+    // --- LÓGICA DE PESTAÑAS ---
+    const tabs = document.querySelectorAll('.tab-btn');
+    const panes = document.querySelectorAll('.tab-pane');
+
+    tabs.forEach(btn => {
+        btn.onclick = () => {
+            tabs.forEach(t => t.classList.remove('active'));
+            panes.forEach(p => p.classList.remove('active'));
+            btn.classList.add('active');
+            document.getElementById(btn.dataset.tab).classList.add('active');
+        };
+    });
+
+    // --- LÓGICA DE SLIDERS ---
+    const exposure = document.getElementById('exposure-slider');
+    const rotation = document.getElementById('model-rotation');
+    const autoRot = document.getElementById('auto-rotate');
+
+    if(exposure) exposure.addEventListener('input', (e) => updateExposure(parseFloat(e.target.value)));
+    if(rotation) rotation.addEventListener('input', (e) => worldGroup.rotation.y = parseFloat(e.target.value));
+    if(autoRot) autoRot.addEventListener('change', (e) => isAutoRotating = e.target.checked);
+    
+    const syncLight = () => {
+        updateLight(
+            parseFloat(document.getElementById('light-angle').value),
+            parseFloat(document.getElementById('light-intensity').value),
+            "#ffffff",
+            parseFloat(document.getElementById('shadow-opacity').value)
+        );
+    };
+
+    document.getElementById('light-angle')?.addEventListener('input', syncLight);
+    document.getElementById('light-intensity')?.addEventListener('input', syncLight);
+    document.getElementById('shadow-opacity')?.addEventListener('input', syncLight);
+}
+
+// --- GESTIÓN TÁCTIL ---
 window.addEventListener('touchstart', (e) => {
     if (e.target.closest('#ui') || e.target.closest('#open-menu')) return;
-    if (renderer.xr.isPresenting) {
-        if (e.touches.length === 1) {
-            touchX = e.touches[0].pageX;
-            isInteracting = false;
-        } else if (e.touches.length === 2) {
-            isInteracting = true;
-            blockSelectUntil = Date.now() + 800;
-            initialDistance = Math.hypot(e.touches[1].pageX - e.touches[0].pageX, e.touches[1].pageY - e.touches[0].pageY);
-            initialScale = worldGroup.scale.x;
-        }
+    if (renderer.xr.isPresenting && e.touches.length === 1) { touchX = e.touches[0].pageX; isInteracting = false; }
+    else if (renderer.xr.isPresenting && e.touches.length === 2) {
+        isInteracting = true;
+        blockSelectUntil = Date.now() + 800;
+        initialDistance = Math.hypot(e.touches[1].pageX - e.touches[0].pageX, e.touches[1].pageY - e.touches[0].pageY);
+        initialScale = worldGroup.scale.x;
     }
-}, { passive: false });
+}, { passive: true });
 
 window.addEventListener('touchmove', (e) => {
     if (e.target.closest('#ui')) return;
@@ -60,15 +114,13 @@ window.addEventListener('touchmove', (e) => {
             const deltaX = e.touches[0].pageX - touchX;
             touchX = e.touches[0].pageX;
             worldGroup.rotation.y += deltaX * 0.007;
-            document.getElementById('model-rotation').value = worldGroup.rotation.y % 6.28;
         } else if (e.touches.length === 2) {
             const currentDistance = Math.hypot(e.touches[1].pageX - e.touches[0].pageX, e.touches[1].pageY - e.touches[0].pageY);
             worldGroup.scale.setScalar(initialScale * (currentDistance / initialDistance));
         }
     }
-}, { passive: false });
+}, { passive: true });
 
-// COLOCACIÓN AR
 const controller = renderer.xr.getController(0);
 controller.addEventListener('select', () => {
     const now = Date.now();
@@ -81,62 +133,11 @@ controller.addEventListener('select', () => {
 });
 scene.add(controller);
 
-// VINCULACIÓN SLIDERS
-const syncLight = () => {
-    updateLight(
-        parseFloat(document.getElementById('light-angle').value),
-        parseFloat(document.getElementById('light-intensity').value),
-        "#ffffff",
-        parseFloat(document.getElementById('shadow-opacity').value)
-    );
-};
-
-document.getElementById('light-angle').addEventListener('input', syncLight);
-document.getElementById('light-intensity').addEventListener('input', syncLight);
-document.getElementById('shadow-opacity').addEventListener('input', syncLight);
-document.getElementById('exposure-slider').addEventListener('input', (e) => updateExposure(parseFloat(e.target.value)));
-document.getElementById('model-rotation').addEventListener('input', (e) => worldGroup.rotation.y = parseFloat(e.target.value));
-document.getElementById('auto-rotate').addEventListener('change', (e) => isAutoRotating = e.target.checked);
-
-async function initApp() {
-    try {
-        const modelSelector = document.getElementById('model-select');
-        const response = await fetch('meshes/list.json');
-        const models = await response.json();
-        modelSelector.innerHTML = '';
-        models.forEach(m => {
-            const opt = document.createElement('option');
-            opt.value = m.file; opt.textContent = m.name;
-            modelSelector.appendChild(opt);
-        });
-        modelSelector.onchange = (e) => loadModel(worldGroup, `meshes/${e.target.value}`, controls);
-        if (models.length > 0) loadModel(worldGroup, `meshes/${models[0].file}`, controls);
-    } catch (e) { console.error(e); }
-}
-
-window.addEventListener('resize', () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-});
-
-renderer.setAnimationLoop((timestamp, frame) => {
+function render(timestamp, frame) {
     if (renderer.xr.isPresenting) {
         scene.background = null;
-        
-        // MODO AR ACTIVADO EN UI
-        ui.classList.add('ar-mode');
-        btnOpen.classList.add('ar-mode');
-        
-        // Mostrar/Ocultar bandeja según estado
-        if (ui.classList.contains('hidden')) {
-            ui.style.display = 'none';
-            btnOpen.style.display = 'block';
-        } else {
-            ui.style.display = 'block';
-            btnOpen.style.display = 'none';
-        }
-
+        if (ui) ui.style.display = 'none';
+        if (btnOpen) btnOpen.style.display = 'none';
         if (frame) {
             const referenceSpace = renderer.xr.getReferenceSpace();
             const session = renderer.xr.getSession();
@@ -156,27 +157,19 @@ renderer.setAnimationLoop((timestamp, frame) => {
         }
     } else {
         scene.background = scene.environment;
-        
-        // VOLVER A MODO ESCRITORIO
-        ui.classList.remove('ar-mode');
-        btnOpen.classList.remove('ar-mode');
-        ui.style.display = 'block';
-        
-        if (ui.classList.contains('hidden')) {
-            btnOpen.style.display = 'block';
-        } else {
-            btnOpen.style.display = 'none';
-        }
+        if (ui) ui.style.display = 'block';
+        if (btnOpen) btnOpen.style.display = ui.classList.contains('hidden') ? 'block' : 'none';
         reticle.visible = false;
     }
-
-    if (isAutoRotating) {
-        worldGroup.rotation.y += 0.01;
-        document.getElementById('model-rotation').value = worldGroup.rotation.y % 6.28;
-    }
-    
+    if (isAutoRotating) worldGroup.rotation.y += 0.01;
     controls.update();
     renderer.render(scene, camera);
+}
+
+window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
-initApp();
+init();

@@ -1,0 +1,131 @@
+<div id="ui">
+    <div class="mobile-handle"></div>
+
+    <div class="ui-header">
+        <div class="brand">ESTUDIO <span>3D</span></div>
+        <button id="close-menu">✕</button>
+    </div>
+
+    <div class="ui-tabs">
+        <button class="tab-btn active" data-tab="tab-model">📦 OBJETO</button>
+        <button class="tab-btn" data-tab="tab-light">🔆 ESCENA</button>
+    </div>
+
+    <div class="ui-content">
+        <div id="tab-model" class="tab-pane active">
+            <div class="control-group">
+                <label>Modelo Activo</label>
+                <select id="model-select"><option>Cargando...</option></select>
+            </div>
+            
+            <div class="control-group row-flex">
+                <label>Giro Automático</label>
+                <label class="switch">
+                    <input type="checkbox" id="auto-rotate">
+                    <span class="slider-round"></span>
+                </label>
+            </div>
+
+            <div class="control-group">
+                <label>Rotación Manual</label>
+                <input type="range" id="model-rotation" min="0" max="6.28" step="0.01">
+            </div>
+        </div>
+
+        <div id="tab-light" class="tab-pane">
+            <div class="control-group">
+                <label>Exposición HDR</label>
+                <input type="range" id="exposure-slider" min="0.1" max="4" step="0.1" value="1.2">
+            </div>
+            
+            <div class="control-group">
+                <label>Ángulo de Luz</label>
+                <input type="range" id="light-angle" min="0" max="6.28" step="0.01">
+            </div>
+            
+            <div class="control-group">
+                <label>Intensidad de Luz</label>
+                <input type="range" id="light-intensity" min="0" max="4" step="0.1">
+            </div>
+            
+            <div class="control-group">
+                <label>Opacidad de Sombra</label>
+                <input type="range" id="shadow-opacity" min="0" max="1" step="0.05">
+            </div>
+        </div>
+    </div>
+</div>
+
+<button id="open-menu">☰ AJUSTES</button>
+
+<style>
+    :root {
+        --accent: #55acee;
+        --bg-glass: rgba(18, 18, 18, 0.75);
+        --border-glass: rgba(255, 255, 255, 0.12);
+    }
+
+    #ui { 
+        position: absolute; top: 0; left: 0; bottom: 0; z-index: 1000;
+        width: 300px; background: var(--bg-glass);
+        border-right: 1px solid var(--border-glass);
+        backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+        display: flex; flex-direction: column;
+        transition: transform 0.5s cubic-bezier(0.19, 1, 0.22, 1);
+        color: white; font-family: sans-serif;
+    }
+
+    #ui.hidden { transform: translateX(-100%); }
+
+    .ui-header { padding: 25px 20px 15px; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
+    .brand { font-weight: 900; letter-spacing: 1.5px; font-size: 14px; }
+    .brand span { color: var(--accent); }
+    #close-menu { background: none; border: none; color: white; cursor: pointer; font-size: 20px; }
+
+    .ui-tabs { display: flex; padding: 0 20px; gap: 10px; flex-shrink: 0; }
+    .tab-btn { 
+        flex: 1; background: none; border: none; color: #888; 
+        padding: 8px 0; font-size: 10px; font-weight: bold; cursor: pointer;
+        border-bottom: 2px solid transparent; transition: 0.3s;
+    }
+    .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+    .ui-content { padding: 20px; overflow-y: auto !important; flex: 1; touch-action: pan-y; }
+    .tab-pane { display: none; }
+    .tab-pane.active { display: block; }
+
+    .control-group { margin-bottom: 20px; }
+    .row-flex { display: flex; justify-content: space-between; align-items: center; }
+    label { font-size: 10px; color: #aaa; text-transform: uppercase; font-weight: bold; display: block; margin-bottom: 8px; }
+
+    select, input[type="range"] { 
+        width: 100%; background: rgba(255,255,255,0.08); border: 1px solid var(--border-glass);
+        color: white; padding: 10px; border-radius: 10px; box-sizing: border-box; outline: none;
+    }
+
+    input[type="range"] { height: 5px; appearance: none; margin: 12px 0; }
+    input[type="range"]::-webkit-slider-thumb { 
+        appearance: none; width: 18px; height: 18px; background: var(--accent); border-radius: 50%; border: 3px solid #1a1a1a;
+    }
+
+    /* SWITCH TOGGLE */
+    .switch { position: relative; display: inline-block; width: 38px; height: 20px; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider-round { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #333; transition: .4s; border-radius: 20px; }
+    .slider-round:before { position: absolute; content: ""; height: 14px; width: 14px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+    input:checked + .slider-round { background-color: var(--accent); }
+    input:checked + .slider-round:before { transform: translateX(18px); }
+
+    #open-menu {
+        position: absolute; top: 20px; left: 20px; z-index: 999;
+        background: var(--bg-glass); border: 1px solid var(--border-glass); color: white;
+        padding: 12px 18px; border-radius: 12px; cursor: pointer; display: none; backdrop-filter: blur(10px);
+    }
+
+    @media (max-width: 600px) {
+        #ui { top: auto; width: 100%; height: 25vh; border-right: none; border-top: 1px solid var(--border-glass); border-radius: 20px 20px 0 0; }
+        #ui.hidden { transform: translateY(100%); }
+        .mobile-handle { width: 35px; height: 4px; background: rgba(255,255,255,0.2); margin: 8px auto 0; border-radius: 2px; flex-shrink: 0; }
+        .ui-header { padding: 10px 20px 5px; }
+    }
+</style>

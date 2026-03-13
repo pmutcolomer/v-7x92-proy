@@ -5,104 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Estudio 3D Pro</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #000; font-family: 'Segoe UI', sans-serif; }
-        
-        /* BARRA LATERAL (Escritorio) */
-        #ui { 
-            position: absolute; top: 0; left: 0; bottom: 0; 
-            z-index: 1000; background: rgba(15, 15, 15, 0.95); 
-            padding: 25px; width: 280px; 
-            border-right: 1px solid rgba(255,255,255,0.1); 
-            backdrop-filter: blur(20px); overflow-y: auto; 
-            box-sizing: border-box;
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            color: white;
-        }
-
-        /* MODO AR: BANDEJA INFERIOR */
-        #ui.ar-mode {
-            top: auto; left: 50%; bottom: 20px;
-            transform: translateX(-50%);
-            width: 90%; max-width: 400px; height: auto;
-            max-height: 40vh;
-            border-radius: 24px;
-            border: 1px solid rgba(255,255,255,0.2);
-            padding: 15px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-        }
-
-        /* ESTADOS OCULTOS */
-        #ui.hidden { transform: translateX(-100%); }
-        #ui.ar-mode.hidden { transform: translateX(-50%) translateY(120%); }
-
-        /* BOTONES FLOTANTES */
-        #open-menu {
-            position: absolute; top: 20px; left: 20px; z-index: 999;
-            background: #55acee; border: none; color: white;
-            padding: 10px 18px; border-radius: 8px; cursor: pointer;
-            font-weight: bold; display: none;
-        }
-        #open-menu.ar-mode {
-            top: auto; bottom: 30px; left: 50%;
-            transform: translateX(-50%);
-            border-radius: 25px;
-        }
-
-        #close-menu { 
-            background: rgba(255,255,255,0.1); border: none; color: white; 
-            float: right; cursor: pointer; font-size: 14px; border-radius: 50%;
-            width: 30px; height: 30px; display: flex; align-items: center; justify-content: center;
-        }
-
-        /* TIPOGRAFÍA Y CONTROLES */
-        .section-title { font-size: 10px; font-weight: bold; color: #55acee; text-transform: uppercase; margin-top: 22px; letter-spacing: 2px; }
-        label { font-size: 11px; color: #888; display: block; margin-top: 10px; }
-        
-        select, input[type="range"] { 
-            width: 100%; margin-top: 6px; background: #222; color: white; 
-            border: 1px solid #333; padding: 8px; border-radius: 8px; 
-            box-sizing: border-box;
-        }
-
-        .row { display: flex; align-items: center; justify-content: space-between; margin-top: 15px; }
-        input[type="checkbox"] { width: 18px; height: 18px; accent-color: #55acee; }
-        hr { border: 0; border-top: 1px solid #333; margin: 15px 0; }
-
-        input[type="range"] { height: 4px; appearance: none; background: #333; border: none; }
-        input[type="range"]::-webkit-slider-thumb { appearance: none; width: 14px; height: 14px; background: #55acee; border-radius: 50%; }
+        /* Solo estilos base para el visor */
+        body { margin: 0; overflow: hidden; background: #000; }
+        canvas { display: block; }
     </style>
 </head>
 <body>
-    <button id="open-menu">☰ AJUSTES</button>
-
-    <div id="ui">
-        <button id="close-menu">✕</button>
-        <div style="font-size: 18px; font-weight: bold;">ESTUDIO <span style="color:#55acee">3D</span></div>
-        
-        <div class="section-title">Configuración</div>
-        <label>Modelo Activo</label>
-        <select id="model-select"><option>Cargando...</option></select>
-        
-        <div class="row">
-            <label style="margin:0">Giro Automático</label>
-            <input type="checkbox" id="auto-rotate">
-        </div>
-
-        <div class="section-title">Visualización</div>
-        <label>Exposición HDR</label>
-        <input type="range" id="exposure-slider" min="0.1" max="4" step="0.1" value="1.2">
-        <label>Rotación Objeto</label>
-        <input type="range" id="model-rotation" min="0" max="6.28" step="0.01" value="0">
-        
-        <div class="section-title">Iluminación</div>
-        <label>Ángulo Luz</label>
-        <input type="range" id="light-angle" min="0" max="6.28" step="0.01" value="0.7">
-        <label>Intensidad</label>
-        <input type="range" id="light-intensity" min="0" max="4" step="0.1" value="1">
-        <label>Opacidad Sombra</label>
-        <input type="range" id="shadow-opacity" min="0" max="1" step="0.05" value="0.4">
-    </div>
-
     <script type="importmap">
     {
         "imports": {
