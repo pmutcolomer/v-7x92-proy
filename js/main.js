@@ -9,7 +9,6 @@ let isAutoRotating = false;
 let hitTestSource = null;
 let hitTestSourceRequested = false;
 
-// VARIABLES GESTOS
 let isInteracting = false;
 let blockSelectUntil = 0;
 let touchX = 0;
@@ -17,39 +16,54 @@ let initialDistance = 0;
 let initialScale = 1;
 
 async function init() {
-    // 1. CARGAR UI
-    const uiResponse = await fetch('ui.html');
-    const uiHtml = await uiResponse.text();
-    const uiContainer = document.createElement('div');
-    uiContainer.innerHTML = uiHtml;
-    document.body.appendChild(uiContainer);
+    try {
+        // 1. CARGAR UI Y ESPERAR A QUE ESTÉ LISTA
+        const uiResponse = await fetch('ui.html');
+        if (!uiResponse.ok) throw new Error('No se pudo cargar ui.html');
+        const uiHtml = await uiResponse.text();
+        
+        const uiContainer = document.createElement('div');
+        uiContainer.innerHTML = uiHtml;
+        document.body.appendChild(uiContainer);
 
-    // 2. VINCULAR BOTONES COLAPSO
-    ui = document.getElementById('ui');
-    btnClose = document.getElementById('close-menu');
-    btnOpen = document.getElementById('open-menu');
+        // 2. ASIGNAR VARIABLES INMEDIATAMENTE DESPUÉS DE INYECTAR
+        ui = document.getElementById('ui');
+        btnClose = document.getElementById('close-menu');
+        btnOpen = document.getElementById('open-menu');
 
-    if (btnClose && btnOpen) {
-        btnClose.onclick = () => { ui.classList.add('hidden'); btnOpen.style.display = 'block'; };
-        btnOpen.onclick = () => { ui.classList.remove('hidden'); btnOpen.style.display = 'none'; };
-    }
+        // Comprobación de seguridad para evitar el error de null
+        if (ui && btnClose && btnOpen) {
+            btnClose.onclick = () => { 
+                ui.classList.add('hidden'); 
+                btnOpen.style.display = 'block'; 
+            };
+            btnOpen.onclick = () => { 
+                ui.classList.remove('hidden'); 
+                btnOpen.style.display = 'none'; 
+            };
+        }
 
-    // 3. ACTIVAR LÓGICA DE PESTAÑAS Y SLIDERS
-    setupUIControls();
+        // 3. ACTIVAR LÓGICA DE CONTROLES
+        setupUIControls();
 
-    // 4. CARGAR MODELOS
-    const response = await fetch('meshes/list.json');
-    const models = await response.json();
-    const selector = document.getElementById('model-select');
-    if (selector) {
-        selector.innerHTML = '';
-        models.forEach(m => {
-            const opt = document.createElement('option');
-            opt.value = m.file; opt.textContent = m.name;
-            selector.appendChild(opt);
-        });
-        selector.onchange = (e) => loadModel(worldGroup, `meshes/${e.target.value}`, controls);
-        if (models.length > 0) loadModel(worldGroup, `meshes/${models[0].file}`, controls);
+        // 4. CARGAR MODELOS
+        const response = await fetch('meshes/list.json');
+        const models = await response.json();
+        const selector = document.getElementById('model-select');
+        
+        if (selector) {
+            selector.innerHTML = '';
+            models.forEach(m => {
+                const opt = document.createElement('option');
+                opt.value = m.file; opt.textContent = m.name;
+                selector.appendChild(opt);
+            });
+            selector.onchange = (e) => loadModel(worldGroup, `meshes/${e.target.value}`, controls);
+            if (models.length > 0) loadModel(worldGroup, `meshes/${models[0].file}`, controls);
+        }
+
+    } catch (error) {
+        console.error("Error en la inicialización:", error);
     }
 
     document.body.appendChild(ARButton.createButton(renderer, { requiredFeatures: ['hit-test'] }));
@@ -57,7 +71,7 @@ async function init() {
 }
 
 function setupUIControls() {
-    // --- LÓGICA DE PESTAÑAS ---
+    // Pestañas
     const tabs = document.querySelectorAll('.tab-btn');
     const panes = document.querySelectorAll('.tab-pane');
 
@@ -66,42 +80,44 @@ function setupUIControls() {
             tabs.forEach(t => t.classList.remove('active'));
             panes.forEach(p => p.classList.remove('active'));
             btn.classList.add('active');
-            document.getElementById(btn.dataset.tab).classList.add('active');
+            const targetId = btn.getAttribute('data-tab');
+            const pane = document.getElementById(targetId);
+            if (pane) pane.classList.add('active');
         };
     });
 
-    // --- LÓGICA DE SLIDERS ---
-    const exposure = document.getElementById('exposure-slider');
-    const rotation = document.getElementById('model-rotation');
-    const autoRot = document.getElementById('auto-rotate');
-
-    if(exposure) exposure.addEventListener('input', (e) => updateExposure(parseFloat(e.target.value)));
-    if(rotation) rotation.addEventListener('input', (e) => worldGroup.rotation.y = parseFloat(e.target.value));
-    if(autoRot) autoRot.addEventListener('change', (e) => isAutoRotating = e.target.checked);
+    // Sliders con comprobación opcional (null-safe)
+    const getEl = (id) => document.getElementById(id);
+    
+    getEl('exposure-slider')?.addEventListener('input', (e) => updateExposure(parseFloat(e.target.value)));
+    getEl('model-rotation')?.addEventListener('input', (e) => worldGroup.rotation.y = parseFloat(e.target.value));
+    getEl('auto-rotate')?.addEventListener('change', (e) => isAutoRotating = e.target.checked);
     
     const syncLight = () => {
         updateLight(
-            parseFloat(document.getElementById('light-angle').value),
-            parseFloat(document.getElementById('light-intensity').value),
+            parseFloat(getEl('light-angle').value || 0),
+            parseFloat(getEl('light-intensity').value || 1),
             "#ffffff",
-            parseFloat(document.getElementById('shadow-opacity').value)
+            parseFloat(getEl('shadow-opacity').value || 0.4)
         );
     };
 
-    document.getElementById('light-angle')?.addEventListener('input', syncLight);
-    document.getElementById('light-intensity')?.addEventListener('input', syncLight);
-    document.getElementById('shadow-opacity')?.addEventListener('input', syncLight);
+    getEl('light-angle')?.addEventListener('input', syncLight);
+    getEl('light-intensity')?.addEventListener('input', syncLight);
+    getEl('shadow-opacity')?.addEventListener('input', syncLight);
 }
 
 // --- GESTIÓN TÁCTIL ---
 window.addEventListener('touchstart', (e) => {
     if (e.target.closest('#ui') || e.target.closest('#open-menu')) return;
-    if (renderer.xr.isPresenting && e.touches.length === 1) { touchX = e.touches[0].pageX; isInteracting = false; }
-    else if (renderer.xr.isPresenting && e.touches.length === 2) {
-        isInteracting = true;
-        blockSelectUntil = Date.now() + 800;
-        initialDistance = Math.hypot(e.touches[1].pageX - e.touches[0].pageX, e.touches[1].pageY - e.touches[0].pageY);
-        initialScale = worldGroup.scale.x;
+    if (renderer.xr.isPresenting) {
+        if (e.touches.length === 1) { touchX = e.touches[0].pageX; isInteracting = false; }
+        else if (e.touches.length === 2) {
+            isInteracting = true;
+            blockSelectUntil = Date.now() + 800;
+            initialDistance = Math.hypot(e.touches[1].pageX - e.touches[0].pageX, e.touches[1].pageY - e.touches[0].pageY);
+            initialScale = worldGroup.scale.x;
+        }
     }
 }, { passive: true });
 
@@ -158,7 +174,7 @@ function render(timestamp, frame) {
     } else {
         scene.background = scene.environment;
         if (ui) ui.style.display = 'block';
-        if (btnOpen) btnOpen.style.display = ui.classList.contains('hidden') ? 'block' : 'none';
+        if (btnOpen) btnOpen.style.display = (ui && ui.classList.contains('hidden')) ? 'block' : 'none';
         reticle.visible = false;
     }
     if (isAutoRotating) worldGroup.rotation.y += 0.01;
