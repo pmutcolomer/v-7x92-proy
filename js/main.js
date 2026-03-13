@@ -4,17 +4,16 @@ import { ARButton } from 'three/addons/webxr/ARButton.js';
 
 const { scene, camera, renderer, controls, updateExposure, updateLight, worldGroup, reticle, dirLight } = setupScene();
 
-// 1. EL CAMBIO CLAVE: Referencia al UI
+// 1. UI Y BOTÓN AR
 const uiElement = document.getElementById('ui');
 
-// Configurar el botón de AR para que use el overlay pero NO lo destruya
 document.body.appendChild(ARButton.createButton(renderer, {
     requiredFeatures: ['hit-test'],
     optionalFeatures: ['dom-overlay'],
-    domOverlay: { root: uiElement } // Vinculamos el div del menú
+    domOverlay: { root: uiElement }
 }));
 
-// 2. INSTRUCCIONES AR (Solo se ven en AR)
+// 2. INSTRUCCIONES PARA EL USUARIO
 const instruction = document.createElement('div');
 instruction.id = 'ar-instruction';
 instruction.innerHTML = 'Mueve el móvil para detectar el suelo';
@@ -24,23 +23,26 @@ document.body.appendChild(instruction);
 let hitTestSource = null;
 let hitTestSourceRequested = false;
 let isAutoRotating = false;
+let isInteracting = false; // Bloquea el "salto" de posición si estamos rotando/escalando
 
 // VARIABLES DE GESTOS
 let touchX = 0;
 let initialDistance = 0;
 let initialScale = 1;
 
-// 3. EVENTOS TÁCTILES MEJORADOS (No bloquean el menú)
+// 3. EVENTOS TÁCTILES (ROTACIÓN Y ESCALA)
 window.addEventListener('touchstart', (e) => {
-    // Si tocamos dentro del menú, no hacemos nada de rotación/escala
+    // Ignorar si tocamos el menú
     if (e.target.closest('#ui') || e.target.closest('#toggle-ui')) return;
-
+    
     if (renderer.xr.isPresenting) {
+        isInteracting = false; 
         if (e.touches.length === 1) {
             touchX = e.touches[0].pageX;
         } else if (e.touches.length === 2) {
             initialDistance = Math.hypot(e.touches[1].pageX - e.touches[0].pageX, e.touches[1].pageY - e.touches[0].pageY);
             initialScale = worldGroup.scale.x;
+            isInteracting = true; 
         }
     }
 }, { passive: false });
@@ -49,39 +51,48 @@ window.addEventListener('touchmove', (e) => {
     if (e.target.closest('#ui') || e.target.closest('#toggle-ui')) return;
 
     if (renderer.xr.isPresenting) {
+        isInteracting = true; // Si hay movimiento, marcamos como interacción activa
+        
         if (e.touches.length === 1) {
+            // Rotación
             const deltaX = e.touches[0].pageX - touchX;
             touchX = e.touches[0].pageX;
             worldGroup.rotation.y += deltaX * 0.007;
             document.getElementById('model-rotation').value = worldGroup.rotation.y % 6.28;
         } else if (e.touches.length === 2) {
+            // Escala (Pinch)
             const currentDistance = Math.hypot(e.touches[1].pageX - e.touches[0].pageX, e.touches[1].pageY - e.touches[0].pageY);
-            worldGroup.scale.setScalar(initialScale * (currentDistance / initialDistance));
+            const newScale = initialScale * (currentDistance / initialDistance);
+            worldGroup.scale.setScalar(newScale);
         }
     }
 });
 
-// COLOCACIÓN EN AR
+// 4. COLOCACIÓN EN EL MUNDO (SELECT)
 const controller = renderer.xr.getController(0);
 controller.addEventListener('select', () => {
-    if (reticle.visible && renderer.xr.isPresenting) {
+    // Solo movemos el objeto si NO estamos rotando o escalando
+    if (reticle.visible && renderer.xr.isPresenting && !isInteracting) {
         worldGroup.position.setFromMatrixPosition(reticle.matrix);
-        // Orientar al usuario al soltar
+        
+        // Orientar el modelo hacia la cámara (el usuario)
         const camPos = new THREE.Vector3();
         camera.getWorldPosition(camPos);
         worldGroup.lookAt(camPos.x, worldGroup.position.y, camPos.z);
     }
+    // Pequeño retardo para limpiar el estado después de soltar
+    setTimeout(() => { isInteracting = false; }, 150);
 });
 scene.add(controller);
 
-// RESIZE (ESCRITORIO)
+// 5. AJUSTE DINÁMICO DE PANTALLA
 window.addEventListener('resize', () => {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
-// VINCULACIÓN DE INTERFAZ (SIEMPRE ACTIVA)
+// 6. VINCULACIÓN DE INTERFAZ
 const modelSelector = document.getElementById('model-select');
 const modelRotationSlider = document.getElementById('model-rotation');
 const autoRotateCheck = document.getElementById('auto-rotate');
@@ -116,18 +127,21 @@ async function initApp() {
     } catch (error) { console.error("Error cargando modelos:", error); }
 }
 
+// 7. BUCLE DE ANIMACIÓN
 renderer.setAnimationLoop((timestamp, frame) => {
     if (renderer.xr.isPresenting) {
         scene.background = null;
         if (frame) {
             const referenceSpace = renderer.xr.getReferenceSpace();
             const session = renderer.xr.getSession();
+            
             if (!hitTestSourceRequested) {
                 session.requestReferenceSpace('viewer').then((viewerSpace) => {
                     session.requestHitTestSource({ space: viewerSpace }).then((source) => hitTestSource = source);
                 });
                 hitTestSourceRequested = true;
             }
+            
             if (hitTestSource) {
                 const results = frame.getHitTestResults(hitTestSource);
                 if (results.length > 0) {
@@ -151,6 +165,7 @@ renderer.setAnimationLoop((timestamp, frame) => {
         worldGroup.rotation.y += 0.01;
         modelRotationSlider.value = worldGroup.rotation.y % 6.28;
     }
+    
     controls.update();
     renderer.render(scene, camera);
 });
