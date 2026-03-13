@@ -37,6 +37,25 @@
         .row { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; }
         input[type="checkbox"] { width: auto; transform: scale(1.1); }
         hr { border: 0; border-top: 1px solid #333; margin: 12px 0; }
+
+        /* Esto obliga al menú a mantener su forma en modo AR */
+        
+        :xr-overlay #ui {
+            background: rgba(10, 10, 10, 0.9) !important;
+            width: 180px !important;
+            height: auto !important;
+            position: absolute !important;
+            top: 10px !important;
+            left: 10px !important;
+            border: 1px solid #333 !important;
+            visibility: visible !important;
+        }
+
+        /* Evitar que Google AR oculte elementos */
+        #ui {
+            user-select: none;
+            -webkit-user-select: none;
+        }
     </style>
 </head>
 <body>
