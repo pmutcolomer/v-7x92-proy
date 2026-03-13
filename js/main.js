@@ -4,46 +4,84 @@ import { ARButton } from 'three/addons/webxr/ARButton.js';
 
 const { scene, camera, renderer, controls, updateExposure, updateLight, worldGroup, reticle, dirLight } = setupScene();
 
+// 1. EL CAMBIO CLAVE: Referencia al UI
+const uiElement = document.getElementById('ui');
+
+// Configurar el botón de AR para que use el overlay pero NO lo destruya
 document.body.appendChild(ARButton.createButton(renderer, {
     requiredFeatures: ['hit-test'],
     optionalFeatures: ['dom-overlay'],
-    domOverlay: { root: document.getElementById('ui') }
+    domOverlay: { root: uiElement } // Vinculamos el div del menú
 }));
+
+// 2. INSTRUCCIONES AR (Solo se ven en AR)
+const instruction = document.createElement('div');
+instruction.id = 'ar-instruction';
+instruction.innerHTML = 'Mueve el móvil para detectar el suelo';
+instruction.style.cssText = 'position:fixed; bottom:120px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.8); color:white; padding:12px 24px; border-radius:30px; font-size:14px; display:none; z-index:9999; pointer-events:none; border: 1px solid #444;';
+document.body.appendChild(instruction);
 
 let hitTestSource = null;
 let hitTestSourceRequested = false;
 let isAutoRotating = false;
 
-// Rotación táctil
+// VARIABLES DE GESTOS
 let touchX = 0;
-window.addEventListener('touchstart', (e) => { if (renderer.xr.isPresenting) touchX = e.touches[0].pageX; });
+let initialDistance = 0;
+let initialScale = 1;
+
+// 3. EVENTOS TÁCTILES MEJORADOS (No bloquean el menú)
+window.addEventListener('touchstart', (e) => {
+    // Si tocamos dentro del menú, no hacemos nada de rotación/escala
+    if (e.target.closest('#ui') || e.target.closest('#toggle-ui')) return;
+
+    if (renderer.xr.isPresenting) {
+        if (e.touches.length === 1) {
+            touchX = e.touches[0].pageX;
+        } else if (e.touches.length === 2) {
+            initialDistance = Math.hypot(e.touches[1].pageX - e.touches[0].pageX, e.touches[1].pageY - e.touches[0].pageY);
+            initialScale = worldGroup.scale.x;
+        }
+    }
+}, { passive: false });
+
 window.addEventListener('touchmove', (e) => {
-    if (renderer.xr.isPresenting && e.touches.length === 1 && e.target.tagName !== 'INPUT') {
-        const deltaX = e.touches[0].pageX - touchX;
-        touchX = e.touches[0].pageX;
-        worldGroup.rotation.y += deltaX * 0.007;
+    if (e.target.closest('#ui') || e.target.closest('#toggle-ui')) return;
+
+    if (renderer.xr.isPresenting) {
+        if (e.touches.length === 1) {
+            const deltaX = e.touches[0].pageX - touchX;
+            touchX = e.touches[0].pageX;
+            worldGroup.rotation.y += deltaX * 0.007;
+            document.getElementById('model-rotation').value = worldGroup.rotation.y % 6.28;
+        } else if (e.touches.length === 2) {
+            const currentDistance = Math.hypot(e.touches[1].pageX - e.touches[0].pageX, e.touches[1].pageY - e.touches[0].pageY);
+            worldGroup.scale.setScalar(initialScale * (currentDistance / initialDistance));
+        }
     }
 });
 
-// Colocación AR
+// COLOCACIÓN EN AR
 const controller = renderer.xr.getController(0);
 controller.addEventListener('select', () => {
     if (reticle.visible && renderer.xr.isPresenting) {
         worldGroup.position.setFromMatrixPosition(reticle.matrix);
-        worldGroup.position.y += 0.001;
+        // Orientar al usuario al soltar
+        const camPos = new THREE.Vector3();
+        camera.getWorldPosition(camPos);
+        worldGroup.lookAt(camPos.x, worldGroup.position.y, camPos.z);
     }
 });
 scene.add(controller);
 
-// --- REPARACIÓN: Resize Automático ---
+// RESIZE (ESCRITORIO)
 window.addEventListener('resize', () => {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 });
 
-// UI y Carga
+// VINCULACIÓN DE INTERFAZ (SIEMPRE ACTIVA)
 const modelSelector = document.getElementById('model-select');
 const modelRotationSlider = document.getElementById('model-rotation');
 const autoRotateCheck = document.getElementById('auto-rotate');
@@ -73,13 +111,9 @@ async function initApp() {
             opt.value = m.file; opt.textContent = m.name;
             modelSelector.appendChild(opt);
         });
-        
-        modelSelector.addEventListener('change', (e) => {
-            loadModel(worldGroup, `meshes/${e.target.value}`, controls);
-        });
-        
+        modelSelector.addEventListener('change', (e) => loadModel(worldGroup, `meshes/${e.target.value}`, controls));
         if (models.length > 0) loadModel(worldGroup, `meshes/${models[0].file}`, controls);
-    } catch (error) { console.error(error); }
+    } catch (error) { console.error("Error cargando modelos:", error); }
 }
 
 renderer.setAnimationLoop((timestamp, frame) => {
@@ -98,16 +132,21 @@ renderer.setAnimationLoop((timestamp, frame) => {
                 const results = frame.getHitTestResults(hitTestSource);
                 if (results.length > 0) {
                     reticle.visible = true;
+                    instruction.style.display = 'none';
                     reticle.matrix.fromArray(results[0].getPose(referenceSpace).transform.matrix);
-                } else { reticle.visible = false; }
+                } else {
+                    reticle.visible = false;
+                    instruction.style.display = 'block';
+                }
             }
         }
         dirLight.target.updateMatrixWorld();
-        dirLight.shadow.camera.updateProjectionMatrix();
     } else {
         scene.background = scene.environment;
         reticle.visible = false;
+        instruction.style.display = 'none';
     }
+
     if (isAutoRotating) {
         worldGroup.rotation.y += 0.01;
         modelRotationSlider.value = worldGroup.rotation.y % 6.28;
