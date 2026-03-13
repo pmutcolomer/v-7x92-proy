@@ -3,19 +3,31 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Visor Pro 3D/AR</title>
+    <title>Estudio 3D Pro</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #000; font-family: sans-serif; }
+        body { margin: 0; overflow: hidden; background: #000; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         
+        /* Contenedor Principal UI */
         #ui { 
             position: absolute; top: 0; left: 0; bottom: 0; 
-            z-index: 1000; background: rgba(15, 15, 15, 0.95); padding: 25px; 
-            color: white; width: 280px; border-right: 1px solid rgba(255,255,255,0.1); 
-            backdrop-filter: blur(20px); overflow-y: auto; pointer-events: auto;
+            z-index: 1000; background: rgba(15, 15, 15, 0.95); 
+            padding: 25px; width: 280px; 
+            border-right: 1px solid rgba(255,255,255,0.1); 
+            backdrop-filter: blur(20px); overflow-y: auto; 
+            box-sizing: border-box; /* FIX: Evita que los sliders se salgan */
             transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            color: white;
         }
 
         #ui.hidden { transform: translateX(-100%); }
+
+        /* Botón para abrir cuando está cerrado */
+        #open-menu {
+            position: absolute; top: 20px; left: 20px; z-index: 999;
+            background: #55acee; border: none; color: white;
+            padding: 10px 15px; border-radius: 8px; cursor: pointer;
+            font-weight: bold; display: none; box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        }
 
         #close-menu { 
             background: rgba(255,255,255,0.1); border: none; color: white; 
@@ -28,15 +40,22 @@
         
         select, input[type="range"] { 
             width: 100%; margin-top: 6px; background: #222; color: white; 
-            border: 1px solid #333; padding: 10px; border-radius: 8px; font-size: 13px;
+            border: 1px solid #333; padding: 8px; border-radius: 8px; 
+            box-sizing: border-box; /* FIX: Alineación perfecta */
         }
 
         .row { display: flex; align-items: center; justify-content: space-between; margin-top: 15px; }
         input[type="checkbox"] { width: 18px; height: 18px; accent-color: #55acee; }
         hr { border: 0; border-top: 1px solid #333; margin: 20px 0; }
+
+        /* Estilo sliders en Chrome */
+        input[type="range"] { height: 4px; appearance: none; background: #333; border: none; }
+        input[type="range"]::-webkit-slider-thumb { appearance: none; width: 14px; height: 14px; background: #55acee; border-radius: 50%; }
     </style>
 </head>
 <body>
+    <button id="open-menu">☰ AJUSTES</button>
+
     <div id="ui">
         <button id="close-menu">✕</button>
         <div style="font-size: 18px; font-weight: bold; letter-spacing: -0.5px;">ESTUDIO <span style="color:#55acee">3D</span></div>

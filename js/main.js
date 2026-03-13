@@ -4,9 +4,11 @@ import { ARButton } from 'three/addons/webxr/ARButton.js';
 
 const { scene, camera, renderer, controls, updateExposure, updateLight, worldGroup, reticle, dirLight } = setupScene();
 
-const uiElement = document.getElementById('ui');
+const ui = document.getElementById('ui');
+const btnClose = document.getElementById('close-menu');
+const btnOpen = document.getElementById('open-menu');
 
-// DESACTIVAMOS domOverlay para evitar la pantalla negra
+// Configuración del botón AR (Sin dom-overlay para evitar pantalla negra en Redmi)
 document.body.appendChild(ARButton.createButton(renderer, {
     requiredFeatures: ['hit-test']
 }));
@@ -15,16 +17,28 @@ let hitTestSource = null;
 let hitTestSourceRequested = false;
 let isAutoRotating = false;
 
-// VARIABLES DE CONTROL
+// VARIABLES DE CONTROL DE GESTOS
 let isInteracting = false;
 let blockSelectUntil = 0;
 let touchX = 0;
 let initialDistance = 0;
 let initialScale = 1;
 
-// GESTIÓN DE TOQUES (Solo rotación y escala en AR)
+// --- LÓGICA DE COLAPSO DEL MENÚ ---
+btnClose.onclick = () => {
+    ui.classList.add('hidden');
+    btnOpen.style.display = 'block';
+};
+
+btnOpen.onclick = () => {
+    ui.classList.remove('hidden');
+    btnOpen.style.display = 'none';
+};
+
+// --- GESTIÓN DE EVENTOS TÁCTILES ---
 window.addEventListener('touchstart', (e) => {
-    if (e.target.closest('#ui')) return;
+    if (e.target.closest('#ui') || e.target.closest('#open-menu')) return;
+    
     if (renderer.xr.isPresenting) {
         if (e.touches.length === 1) {
             touchX = e.touches[0].pageX;
@@ -39,10 +53,12 @@ window.addEventListener('touchstart', (e) => {
 }, { passive: false });
 
 window.addEventListener('touchmove', (e) => {
-    if (e.target.closest('#ui')) return;
+    if (e.target.closest('#ui') || e.target.closest('#open-menu')) return;
+
     if (renderer.xr.isPresenting) {
         isInteracting = true;
         blockSelectUntil = Date.now() + 800;
+        
         if (e.touches.length === 1) {
             const deltaX = e.touches[0].pageX - touchX;
             touchX = e.touches[0].pageX;
@@ -54,6 +70,7 @@ window.addEventListener('touchmove', (e) => {
     }
 }, { passive: false });
 
+// COLOCACIÓN EN AR (SELECT)
 const controller = renderer.xr.getController(0);
 controller.addEventListener('select', () => {
     const now = Date.now();
@@ -66,7 +83,7 @@ controller.addEventListener('select', () => {
 });
 scene.add(controller);
 
-// VINCULACIÓN DE SLIDERS (Escritorio)
+// --- VINCULACIÓN DE CONTROLES ---
 const syncLight = () => {
     updateLight(
         parseFloat(document.getElementById('light-angle').value),
@@ -82,7 +99,6 @@ document.getElementById('shadow-opacity').addEventListener('input', syncLight);
 document.getElementById('exposure-slider').addEventListener('input', (e) => updateExposure(parseFloat(e.target.value)));
 document.getElementById('model-rotation').addEventListener('input', (e) => worldGroup.rotation.y = parseFloat(e.target.value));
 document.getElementById('auto-rotate').addEventListener('change', (e) => isAutoRotating = e.target.checked);
-document.getElementById('close-menu').onclick = () => uiElement.classList.toggle('hidden');
 
 async function initApp() {
     try {
@@ -106,10 +122,13 @@ window.addEventListener('resize', () => {
     renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
+// --- BUCLE DE RENDERIZADO ---
 renderer.setAnimationLoop((timestamp, frame) => {
     if (renderer.xr.isPresenting) {
         scene.background = null;
-        uiElement.style.display = 'none'; // OCULTAR UI EN AR PARA EVITAR ERRORES
+        ui.style.display = 'none';
+        btnOpen.style.display = 'none';
+        
         if (frame) {
             const referenceSpace = renderer.xr.getReferenceSpace();
             const session = renderer.xr.getSession();
@@ -129,10 +148,21 @@ renderer.setAnimationLoop((timestamp, frame) => {
         }
     } else {
         scene.background = scene.environment;
-        uiElement.style.display = 'block'; // MOSTRAR UI AL SALIR
+        ui.style.display = 'block';
+        // Solo mostramos el botón de abrir si el menú está colapsado
+        if (ui.classList.contains('hidden')) {
+            btnOpen.style.display = 'block';
+        } else {
+            btnOpen.style.display = 'none';
+        }
         reticle.visible = false;
     }
-    if (isAutoRotating) worldGroup.rotation.y += 0.01;
+
+    if (isAutoRotating) {
+        worldGroup.rotation.y += 0.01;
+        document.getElementById('model-rotation').value = worldGroup.rotation.y % 6.28;
+    }
+    
     controls.update();
     renderer.render(scene, camera);
 });
