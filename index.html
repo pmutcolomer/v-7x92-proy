@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Visor Pro 3D/AR</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #000; font-family: sans-serif; }
+        
+        #ui { 
+            position: absolute; top: 10px; left: 10px; z-index: 1000; 
+            background: rgba(10, 10, 10, 0.85); padding: 12px; border-radius: 10px; 
+            color: white; width: 180px; border: 1px solid #333; max-height: 90vh; 
+            overflow-y: auto; backdrop-filter: blur(5px); pointer-events: auto;
+            transition: transform 0.3s ease, opacity 0.3s ease;
+        }
+
+        #ui::-webkit-scrollbar { width: 4px; }
+        #ui::-webkit-scrollbar-thumb { background: #444; border-radius: 10px; }
+        #ui.hidden { transform: translateX(-220px); opacity: 0; pointer-events: none; }
+        
+        #toggle-ui {
+            position: absolute; top: 10px; left: 10px; z-index: 1001;
+            background: rgba(10, 10, 10, 0.9); color: white; border: 1px solid #333;
+            padding: 8px 12px; border-radius: 6px; cursor: pointer; display: none; font-size: 12px;
+        }
+
+        #close-menu { background: none; border: none; color: #ff4444; float: right; cursor: pointer; font-size: 16px; font-weight: bold; }
+        label { font-size: 9px; text-transform: uppercase; color: #888; display: block; margin-top: 8px; }
+        
+        select, input { 
+            width: 100%; margin-top: 4px; background: #222; color: white; 
+            border: 1px solid #444; padding: 6px; border-radius: 4px; font-size: 12px;
+            box-sizing: border-box; 
+        }
+
+        .row { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; }
+        input[type="checkbox"] { width: auto; transform: scale(1.1); }
+        hr { border: 0; border-top: 1px solid #333; margin: 12px 0; }
+    </style>
+</head>
+<body>
+    <button id="toggle-ui">AJUSTES</button>
+    <div id="ui">
+        <button id="close-menu">✕</button>
+        <strong>OBJETO</strong>
+        <label>Modelo 3D</label>
+        <select id="model-select"><option>Cargando...</option></select>
+        <label>Rotación Manual</label>
+        <input type="range" id="model-rotation" min="0" max="6.28" step="0.01" value="0">
+        <div class="row"><label>Auto-Rotar</label><input type="checkbox" id="auto-rotate"></div>
+        <label>Exposición HDR</label>
+        <input type="range" id="exposure-slider" min="0.1" max="4" step="0.1" value="1.2">
+        <hr>
+        <strong>LUZ & SOMBRA</strong>
+        <label>Ángulo Luz</label>
+        <input type="range" id="light-angle" min="0" max="6.28" step="0.01" value="0.7">
+        <label>Potencia Luz</label>
+        <input type="range" id="light-intensity" min="0" max="4" step="0.1" value="1">
+        <label>Opacidad Suelo</label>
+        <input type="range" id="shadow-opacity" min="0" max="1" step="0.05" value="0.4">
+        <label>Color Luz</label>
+        <input type="color" id="light-color" value="#ffffff">
+    </div>
+
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
+    <script>
+        const ui = document.getElementById('ui');
+        const closeBtn = document.getElementById('close-menu');
+        const openBtn = document.getElementById('toggle-ui');
+        closeBtn.onclick = (e) => { e.stopPropagation(); ui.classList.add('hidden'); openBtn.style.display = 'block'; };
+        openBtn.onclick = (e) => { e.stopPropagation(); ui.classList.remove('hidden'); openBtn.style.display = 'none'; };
+    </script>
+    <script type="module" src="./js/main.js"></script>
+</body>
+</html>
