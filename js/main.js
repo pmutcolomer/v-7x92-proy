@@ -8,7 +8,7 @@ const ui = document.getElementById('ui');
 const btnClose = document.getElementById('close-menu');
 const btnOpen = document.getElementById('open-menu');
 
-// Configuración del botón AR (Sin dom-overlay para evitar pantalla negra en Redmi)
+// Botón AR Estándar (Sin overlay para evitar pantalla negra en Redmi)
 document.body.appendChild(ARButton.createButton(renderer, {
     requiredFeatures: ['hit-test']
 }));
@@ -17,14 +17,14 @@ let hitTestSource = null;
 let hitTestSourceRequested = false;
 let isAutoRotating = false;
 
-// VARIABLES DE CONTROL DE GESTOS
+// VARIABLES DE GESTOS
 let isInteracting = false;
 let blockSelectUntil = 0;
 let touchX = 0;
 let initialDistance = 0;
 let initialScale = 1;
 
-// --- LÓGICA DE COLAPSO DEL MENÚ ---
+// --- COLAPSO DE MENÚ ---
 btnClose.onclick = () => {
     ui.classList.add('hidden');
     btnOpen.style.display = 'block';
@@ -35,10 +35,9 @@ btnOpen.onclick = () => {
     btnOpen.style.display = 'none';
 };
 
-// --- GESTIÓN DE EVENTOS TÁCTILES ---
+// --- GESTIÓN DE TOQUES ---
 window.addEventListener('touchstart', (e) => {
     if (e.target.closest('#ui') || e.target.closest('#open-menu')) return;
-    
     if (renderer.xr.isPresenting) {
         if (e.touches.length === 1) {
             touchX = e.touches[0].pageX;
@@ -53,16 +52,15 @@ window.addEventListener('touchstart', (e) => {
 }, { passive: false });
 
 window.addEventListener('touchmove', (e) => {
-    if (e.target.closest('#ui') || e.target.closest('#open-menu')) return;
-
+    if (e.target.closest('#ui')) return;
     if (renderer.xr.isPresenting) {
         isInteracting = true;
         blockSelectUntil = Date.now() + 800;
-        
         if (e.touches.length === 1) {
             const deltaX = e.touches[0].pageX - touchX;
             touchX = e.touches[0].pageX;
             worldGroup.rotation.y += deltaX * 0.007;
+            document.getElementById('model-rotation').value = worldGroup.rotation.y % 6.28;
         } else if (e.touches.length === 2) {
             const currentDistance = Math.hypot(e.touches[1].pageX - e.touches[0].pageX, e.touches[1].pageY - e.touches[0].pageY);
             worldGroup.scale.setScalar(initialScale * (currentDistance / initialDistance));
@@ -70,7 +68,7 @@ window.addEventListener('touchmove', (e) => {
     }
 }, { passive: false });
 
-// COLOCACIÓN EN AR (SELECT)
+// COLOCACIÓN AR
 const controller = renderer.xr.getController(0);
 controller.addEventListener('select', () => {
     const now = Date.now();
@@ -83,7 +81,7 @@ controller.addEventListener('select', () => {
 });
 scene.add(controller);
 
-// --- VINCULACIÓN DE CONTROLES ---
+// VINCULACIÓN SLIDERS
 const syncLight = () => {
     updateLight(
         parseFloat(document.getElementById('light-angle').value),
@@ -122,13 +120,23 @@ window.addEventListener('resize', () => {
     renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
-// --- BUCLE DE RENDERIZADO ---
 renderer.setAnimationLoop((timestamp, frame) => {
     if (renderer.xr.isPresenting) {
         scene.background = null;
-        ui.style.display = 'none';
-        btnOpen.style.display = 'none';
         
+        // MODO AR ACTIVADO EN UI
+        ui.classList.add('ar-mode');
+        btnOpen.classList.add('ar-mode');
+        
+        // Mostrar/Ocultar bandeja según estado
+        if (ui.classList.contains('hidden')) {
+            ui.style.display = 'none';
+            btnOpen.style.display = 'block';
+        } else {
+            ui.style.display = 'block';
+            btnOpen.style.display = 'none';
+        }
+
         if (frame) {
             const referenceSpace = renderer.xr.getReferenceSpace();
             const session = renderer.xr.getSession();
@@ -148,8 +156,12 @@ renderer.setAnimationLoop((timestamp, frame) => {
         }
     } else {
         scene.background = scene.environment;
+        
+        // VOLVER A MODO ESCRITORIO
+        ui.classList.remove('ar-mode');
+        btnOpen.classList.remove('ar-mode');
         ui.style.display = 'block';
-        // Solo mostramos el botón de abrir si el menú está colapsado
+        
         if (ui.classList.contains('hidden')) {
             btnOpen.style.display = 'block';
         } else {
