@@ -6,13 +6,10 @@ const { scene, camera, renderer, controls, updateExposure, updateLight, worldGro
 
 const uiElement = document.getElementById('ui');
 
-// FIX PANTALLA NEGRA: Asegurar que el overlay no bloquee el inicio de sesión XR
-const arButton = ARButton.createButton(renderer, {
-    requiredFeatures: ['hit-test'],
-    optionalFeatures: ['dom-overlay'],
-    domOverlay: { root: uiElement }
-});
-document.body.appendChild(arButton);
+// DESACTIVAMOS domOverlay para evitar la pantalla negra
+document.body.appendChild(ARButton.createButton(renderer, {
+    requiredFeatures: ['hit-test']
+}));
 
 let hitTestSource = null;
 let hitTestSourceRequested = false;
@@ -25,17 +22,9 @@ let touchX = 0;
 let initialDistance = 0;
 let initialScale = 1;
 
-const checkUI = (e) => {
-    if (e.target.closest('#ui')) {
-        isInteracting = true;
-        blockSelectUntil = Date.now() + 600;
-        return true;
-    }
-    return false;
-};
-
+// GESTIÓN DE TOQUES (Solo rotación y escala en AR)
 window.addEventListener('touchstart', (e) => {
-    if (checkUI(e)) return;
+    if (e.target.closest('#ui')) return;
     if (renderer.xr.isPresenting) {
         if (e.touches.length === 1) {
             touchX = e.touches[0].pageX;
@@ -58,17 +47,12 @@ window.addEventListener('touchmove', (e) => {
             const deltaX = e.touches[0].pageX - touchX;
             touchX = e.touches[0].pageX;
             worldGroup.rotation.y += deltaX * 0.007;
-            document.getElementById('model-rotation').value = worldGroup.rotation.y % 6.28;
         } else if (e.touches.length === 2) {
             const currentDistance = Math.hypot(e.touches[1].pageX - e.touches[0].pageX, e.touches[1].pageY - e.touches[0].pageY);
             worldGroup.scale.setScalar(initialScale * (currentDistance / initialDistance));
         }
     }
 }, { passive: false });
-
-window.addEventListener('touchend', () => {
-    if (isInteracting) blockSelectUntil = Date.now() + 500;
-});
 
 const controller = renderer.xr.getController(0);
 controller.addEventListener('select', () => {
@@ -82,7 +66,7 @@ controller.addEventListener('select', () => {
 });
 scene.add(controller);
 
-// VINCULACIÓN DE SLIDERS
+// VINCULACIÓN DE SLIDERS (Escritorio)
 const syncLight = () => {
     updateLight(
         parseFloat(document.getElementById('light-angle').value),
@@ -125,6 +109,7 @@ window.addEventListener('resize', () => {
 renderer.setAnimationLoop((timestamp, frame) => {
     if (renderer.xr.isPresenting) {
         scene.background = null;
+        uiElement.style.display = 'none'; // OCULTAR UI EN AR PARA EVITAR ERRORES
         if (frame) {
             const referenceSpace = renderer.xr.getReferenceSpace();
             const session = renderer.xr.getSession();
@@ -144,12 +129,10 @@ renderer.setAnimationLoop((timestamp, frame) => {
         }
     } else {
         scene.background = scene.environment;
+        uiElement.style.display = 'block'; // MOSTRAR UI AL SALIR
         reticle.visible = false;
     }
-    if (isAutoRotating) {
-        worldGroup.rotation.y += 0.01;
-        document.getElementById('model-rotation').value = worldGroup.rotation.y % 6.28;
-    }
+    if (isAutoRotating) worldGroup.rotation.y += 0.01;
     controls.update();
     renderer.render(scene, camera);
 });
